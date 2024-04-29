@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Audio Recorder</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/recordrtc"></script>
+  </head>
+  <body>
+    <h1>Audio Recorder</h1>
+    <form
+      method="post"
+      action="{% url 'save_audio' %}"
+      enctype="multipart/form-data"
+    >
+      {% csrf_token %}
+      <input type="hidden" id="audio_data" name="audio_file" />
+      <button type="button" id="start_recording">Start Recording</button>
+      <button type="button" id="stop_recording" disabled>Stop Recording</button>
+      <button type="submit" id="save_recording" disabled>Save Recording</button>
+    </form>
+
+    <audio controls id="audio_player" style="display: none"></audio>
+
+    <ul>
+      {% for recording in recordings %}
+      <li><a href="{{ recording.audio_file.url }}">{{ recording }}</a></li>
+      {% endfor %}
+    </ul>
+
+    <script>
+      let recorder;
+
+      $("#start_recording").click(function () {
+        navigator.mediaDevices
+          .getUserMedia({ audio: true })
+          .then(function (stream) {
+            recorder = new RecordRTC(stream, {
+              type: "audio",
+            });
+            recorder.startRecording();
+            $("#start_recording").prop("disabled", true);
+            $("#stop_recording").prop("disabled", false);
+          });
+      });
+
+      $("#stop_recording").click(function () {
+        recorder.stopRecording(function () {
+          let blob = recorder.getBlob();
+          let audioURL = URL.createObjectURL(blob);
+          $("#audio_data").val(blob);
+          $("#audio_player").attr("src", audioURL);
+          $("#audio_player").show();
+          $("#save_recording").prop("disabled", false);
+          $("#start_recording").prop("disabled", false);
+          $("#stop_recording").prop("disabled", true);
+        });
+      });
+    </script>
+  </body>
+</html>
