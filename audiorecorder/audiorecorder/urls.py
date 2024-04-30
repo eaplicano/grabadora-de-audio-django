@@ -16,7 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from recorder.views import home, save_audio, test
+from recorder.views import home, save_audio, test, download_audio
 
 
 urlpatterns = [
@@ -24,5 +24,6 @@ urlpatterns = [
     path('', home, name='home'),
     path('save/', save_audio,name='save_audio'),
     path('test/', test, name='test'),
+    path('download_audio/<int:recording_id>/', download_audio, name='download_audio'),
     
 ]

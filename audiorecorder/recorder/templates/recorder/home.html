@@ -7,16 +7,15 @@
   </head>
   <body>
     <h1>Audio Recorder</h1>
-    <form
-      method="post"
-      action="{% url 'save_audio' %}"
-      enctype="multipart/form-data"
-    >
+    <form method="post" enctype="text/plain">
       {% csrf_token %}
+
       <input type="hidden" id="audio_data" name="audio_file" />
+      <label for="audio_text">Descripcion del Audio:</label>
+      <input type="text" id="audio_text" name="audio_text" />
       <button type="button" id="start_recording">Start Recording</button>
       <button type="button" id="stop_recording" disabled>Stop Recording</button>
-      <button type="submit" id="save_recording" disabled>Save Recording</button>
+      <button type="button" id="save_recording" disabled>Save Recording</button>
     </form>
 
     <audio controls id="audio_player" style="display: none"></audio>
@@ -26,9 +25,51 @@
       <li><a href="{{ recording.audio_file.url }}">{{ recording }}</a></li>
       {% endfor %}
     </ul>
+    {% for recording in recordings %}
+    <p>Audio ID: {{ recording.id }}</p>
+
+    <audio controls>
+      <source src="{% url 'download_audio' recording.id %}" type="audio/mpeg" />
+      Your browser does not support the audio element.
+    </audio>
+    <a href="{% url 'download_audio' recording.id %}" download
+      >Descargar Audio</a
+    >
+    {% endfor %}
 
     <script>
+      function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== "") {
+          const cookies = document.cookie.split(";");
+          for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            // Busca el nombre del token CSRF en el formato 'csrftoken=...'
+            if (cookie.startsWith(name + "=")) {
+              cookieValue = decodeURIComponent(
+                cookie.substring(name.length + 1)
+              );
+              break;
+            }
+          }
+        }
+        return cookieValue;
+      }
+
+      // Configuración de la solicitud AJAX para enviar el token CSRF
+      $.ajaxSetup({
+        beforeSend: function (xhr, settings) {
+          // Agrega el token CSRF al encabezado de la solicitud
+          if (
+            !/^(GET|HEAD|OPTIONS|TRACE)$/i.test(settings.type) &&
+            !this.crossDomain
+          ) {
+            xhr.setRequestHeader("X-CSRFToken", getCookie("csrftoken"));
+          }
+        },
+      });
       let recorder;
+      let chunks = [];
 
       $("#start_recording").click(function () {
         navigator.mediaDevices
@@ -37,7 +78,11 @@
             recorder = new RecordRTC(stream, {
               type: "audio",
             });
+            recorder.ondataavailable = function (e) {
+              chunks.push(e.data);
+            };
             recorder.startRecording();
+
             $("#start_recording").prop("disabled", true);
             $("#stop_recording").prop("disabled", false);
           });
@@ -46,13 +91,47 @@
       $("#stop_recording").click(function () {
         recorder.stopRecording(function () {
           let blob = recorder.getBlob();
-          let audioURL = URL.createObjectURL(blob);
+          let audioData = btoa(
+            new Uint8Array(blob).reduce(
+              (data, byte) => data + String.fromCharCode(byte),
+              ""
+            )
+          );
+          console.log(audioData);
+
           $("#audio_data").val(blob);
-          $("#audio_player").attr("src", audioURL);
+          $("#audio_player").attr("src", URL.createObjectURL(blob));
           $("#audio_player").show();
           $("#save_recording").prop("disabled", false);
           $("#start_recording").prop("disabled", false);
           $("#stop_recording").prop("disabled", true);
+        });
+      });
+
+      $("#save_recording").click(function () {
+        let formData = new FormData();
+        let blob = recorder.getBlob();
+        let nombre = $("#audio_text").val();
+
+        formData.append("audio_file", blob);
+        formData.append("name", nombre);
+
+        $.ajax({
+          url: "{% url 'save_audio' %}",
+          type: "POST",
+          data: formData,
+          processData: false,
+          contentType: false,
+          success: function (response) {
+            // Manejar la respuesta del servidor si es necesario
+            console.log(response);
+            // Recargar la página o realizar cualquier otra acción necesaria
+            window.location.reload();
+          },
+          error: function (xhr, status, error) {
+            // Manejar el error si ocurre alguno
+            console.error(error);
+          },
         });
       });
     </script>
